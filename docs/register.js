@@ -1,51 +1,86 @@
-document.addEventListener('DOMContentLoaded', () => {
-  const form = document.getElementById('registerForm');
+// docs/register.js
+// Front-end for the Register form (GitHub Pages compatible)
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
+(() => {
+  // ⬇️ Replace with your actual Vercel app name once deployed
+  const VERCEL_BASE = 'https://hcaptcha-captcha-demo-webpage.app';
 
-    const name = document.getElementById('registerName').value.trim();
-    const email = document.getElementById('registerEmail').value.trim();
-    const password = document.getElementById('registerPassword').value;
-    const confirmPassword = document.getElementById('registerConfirmPassword').value;
+  // On GitHub Pages we must call the Vercel API; otherwise use same-origin
+  const isGithubPages = location.hostname.endsWith('.github.io');
+  const API_BASE = isGithubPages ? VERCEL_BASE : '';
 
-    if (!name || !email || !password) {
-      alert('Please fill out all required fields.');
-      return;
+  function getHcaptchaToken() {
+    // Prefer the official API if present
+    if (window.hcaptcha && typeof hcaptcha.getResponse === 'function') {
+      return hcaptcha.getResponse();
     }
-    if (password !== confirmPassword) {
-      alert('Passwords do not match.');
-      return;
+    // Fallback: hidden textarea h-captcha-response
+    const el = document.querySelector('textarea[name="h-captcha-response"]');
+    return el ? el.value : '';
+  }
+
+  function resetHcaptcha() {
+    if (window.hcaptcha && typeof hcaptcha.reset === 'function') {
+      hcaptcha.reset();
     }
+  }
 
-    // hCaptcha puts the token into a hidden textarea named 'h-captcha-response'
-    const tokenEl = document.querySelector('textarea[name="h-captcha-response"]');
-    const token = tokenEl ? tokenEl.value : '';
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('registerForm');
+    const submitBtn = form.querySelector('button[type="submit"]');
 
-    if (!token) {
-      alert('Please complete the CAPTCHA.');
-      return;
-    }
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-    try {
-      const resp = await fetch('/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, token })
-      });
-      const result = await resp.json();
+      const name = document.getElementById('registerName').value.trim();
+      const email = document.getElementById('registerEmail').value.trim();
+      const password = document.getElementById('registerPassword').value;
+      const confirmPassword = document.getElementById('registerConfirmPassword').value;
 
-      if (result.success) {
-        alert('Registration successful!');
-      } else {
-        alert('Registration failed: ' + (result.message || 'Unknown error.'));
-        // If you want, you can reset the widget so user can try again:
-        if (window.hcaptcha) hcaptcha.reset();
+      if (!name || !email || !password) {
+        alert('Please fill out all required fields.');
+        return;
       }
-    } catch (err) {
-      console.error('Error during registration:', err);
-      alert('An error occurred. Please try again.');
-      if (window.hcaptcha) hcaptcha.reset();
-    }
+      if (password !== confirmPassword) {
+        alert('Passwords do not match.');
+        return;
+      }
+
+      const token = getHcaptchaToken();
+      if (!token) {
+        alert('Please complete the hCaptcha challenge.');
+        return;
+      }
+
+      // UX: prevent double submits
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      try {
+        const resp = await fetch(`${API_BASE}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password, token })
+        });
+
+        const result = await resp.json();
+
+        if (result.success) {
+          alert('Registration successful!');
+          form.reset();
+          resetHcaptcha();
+        } else {
+          alert('Registration failed: ' + (result.message || 'Unknown error.'));
+          resetHcaptcha();
+        }
+      } catch (err) {
+        console.error('Register error:', err);
+        alert('Network or server error. Please try again.');
+        resetHcaptcha();
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Register';
+      }
+    });
   });
-});
+})();
