@@ -1,20 +1,16 @@
-// docs/register.js
-// Front-end for the Register form (GitHub Pages compatible)
-
+// docs/register.js  (also works if you move it to /public)
 (() => {
-  // ⬇️ Replace with your actual Vercel app name once deployed
-  const VERCEL_BASE = 'https://hcaptcha-captcha-demo-webpage.app';
+  // ⬇️ Replace with your actual Vercel deployment URL (no trailing slash)
+  const VERCEL_BASE = 'https://<your-project>.vercel.app';
 
-  // On GitHub Pages we must call the Vercel API; otherwise use same-origin
   const isGithubPages = location.hostname.endsWith('.github.io');
-  const API_BASE = isGithubPages ? VERCEL_BASE : '';
+  // Always hit the serverless route /api/register
+  const API_URL = (isGithubPages ? VERCEL_BASE : '') + '/api/register';
 
   function getHcaptchaToken() {
-    // Prefer the official API if present
     if (window.hcaptcha && typeof hcaptcha.getResponse === 'function') {
       return hcaptcha.getResponse();
     }
-    // Fallback: hidden textarea h-captcha-response
     const el = document.querySelector('textarea[name="h-captcha-response"]');
     return el ? el.value : '';
   }
@@ -52,17 +48,15 @@
         return;
       }
 
-      // UX: prevent double submits
       submitBtn.disabled = true;
       submitBtn.textContent = 'Submitting...';
 
       try {
-        const resp = await fetch(`${API_BASE}/register`, {
+        const resp = await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, email, password, token })
         });
-
         const result = await resp.json();
 
         if (result.success) {
